@@ -10,6 +10,8 @@ const router = express.Router();
 
 router.get("/",eventController.getAllEvents);
 
+router.get("/getEventById/:id", eventController.getEventById);
+
 router.post("/createEvent",eventController.createEvent);
 
 router.put("/editEvent/:id",eventController.updateEvent);

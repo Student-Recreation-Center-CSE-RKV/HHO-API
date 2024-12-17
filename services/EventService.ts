@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { isValidObjectId } from "mongoose";
 import { NotFoundError } from "../exceptions/CustomError";
 import EventModel from "../models/EventModel";
 import eventModel from "../models/EventModel";
@@ -61,6 +61,16 @@ class EventService {
       return await eventModel.find(query);
     } catch (error) {
       console.error("Error fetching matched events:", error);
+      throw error;
+    }
+  }
+
+  async getEventById(id: string): Promise<EventDocument>{
+    try{
+      if(!isValidObjectId(id)) throw new NotFoundError("Invalid ObjectId");
+      return await EventModel.findById(id);
+    }catch(error){
+      console.error("Error getting the event with given Id:", error);
       throw error;
     }
   }

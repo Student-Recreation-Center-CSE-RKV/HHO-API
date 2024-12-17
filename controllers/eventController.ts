@@ -63,6 +63,18 @@ class EventController {
     }
   }
 
+  async getEventById(req: Request, res: Response, next: NextFunction){
+    const { id }= req.params;
+    console.log("Id is ",id);
+    try {
+      const event = await eventService.getEventById(id);
+      console.log(event);
+      res.status(200).json({success:true, data:event});
+    } catch (err) {
+      next(err);
+    }
+  }
+
   //subEventRoutes
   async addSubEvent(req: Request, res: Response, next: NextFunction){
     const subEventData = req.body;
