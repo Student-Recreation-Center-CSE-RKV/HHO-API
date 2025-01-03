@@ -5,50 +5,67 @@ import eventModel from "../models/EventModel";
 import subEventModel from "../models/SubEventModel";
 import eventRepo from "../repository/EventRepo";
 import { EventDocument, SubEventDocument } from "../types/eventType"; // Assuming you have types defined for Event
-import { getKey,setKey } from "../config/redisClient";
+import { getKey, setKey, deleteKey } from "../config/redisClient";
 class EventService {
-  async createEvent(eventData: Partial<EventDocument>): Promise<EventDocument | null> {
-      const record = await eventRepo.create(eventData);
-      return record;
+  async createEvent(
+    eventData: Partial<EventDocument>
+  ): Promise<EventDocument | null> {
+    const record = await eventRepo.create(eventData);
+    const cacheExist = await getKey("events");
+    if (cacheExist) {
+      await deleteKey("events");
+    }
+    return record;
   }
 
-  async updateEvent(eventId: string, eventData: Partial<EventDocument>): Promise<EventDocument | null> {
-      const event = await eventRepo.update(eventId, eventData);
-      if (!event) {
-        throw new NotFoundError("Event not found with given Id");
-      }
-      return event;
+  async updateEvent(
+    eventId: string,
+    eventData: Partial<EventDocument>
+  ): Promise<EventDocument | null> {
+    const event = await eventRepo.update(eventId, eventData);
+    if (!event) {
+      throw new NotFoundError("Event not found with given Id");
+    }
+    const cacheExist = await getKey("events");
+    if (cacheExist) {
+      await deleteKey("events");
+    }
+    return event;
   }
 
   async deleteEvent(eventId: string): Promise<EventDocument> {
-      const event = await eventRepo.delete(eventId);
-      if (!event) {
-        throw new NotFoundError("Event not found with given Id");
-      }
-      return event;
-      // await eventModel.findByIdAndDelete(eventId);
-      // await subEventModel.deleteMany({ mainEventId: eventId });
+    const event = await eventRepo.delete(eventId);
+    if (!event) {
+      throw new NotFoundError("Event not found with given Id");
+    }
+    const cacheExist = await getKey("events");
+    if (cacheExist) {
+      await deleteKey("events");
+    }
+    return event;
+    // await eventModel.findByIdAndDelete(eventId);
+    // await subEventModel.deleteMany({ mainEventId: eventId });
   }
 
   async getAllEvents(): Promise<EventDocument[]> {
     const events = await getKey("events");
-    if(!events){
-    try {
-      const fetchedEvents =  await eventRepo.getAll();
-      await setKey("events",JSON.stringify(fetchedEvents),60);
-      return fetchedEvents;
-    } catch (error) {
-      console.error("Error fetching events:", error);
-      throw new Error("Failed in getting all events");
+    if (!events) {
+      try {
+        const fetchedEvents = await eventRepo.getAll();
+        await setKey("events", JSON.stringify(fetchedEvents), 60);
+        return fetchedEvents;
+      } catch (error) {
+        console.error("Error fetching events:", error);
+        throw new Error("Failed in getting all events");
+      }
+    } else {
+      return JSON.parse(events);
     }
-  }else{
-    return JSON.parse(events);
-  }
   }
   async getMatchedEvents(searchTerm: string): Promise<EventDocument[]> {
     try {
       const query: any = { $or: [] };
-      
+
       // Check if searchTerm is a number or a valid date or a string
       if (!isNaN(Number(searchTerm))) {
         query.$or.push({ amount: Number(searchTerm) });
@@ -57,13 +74,13 @@ class EventService {
         query.$or.push({
           date: {
             $gte: new Date(dateSearch.setHours(0, 0, 0)),
-            $lt: new Date(dateSearch.setHours(23, 59, 59))
-          }
+            $lt: new Date(dateSearch.setHours(23, 59, 59)),
+          },
         });
       } else {
         query.$or.push({ eventName: { $regex: searchTerm, $options: "i" } });
       }
-      
+
       return await eventModel.find(query);
     } catch (error) {
       console.error("Error fetching matched events:", error);
@@ -71,11 +88,11 @@ class EventService {
     }
   }
 
-  async getEventById(id: string): Promise<EventDocument>{
-    try{
-      if(!isValidObjectId(id)) throw new NotFoundError("Invalid ObjectId");
+  async getEventById(id: string): Promise<EventDocument> {
+    try {
+      if (!isValidObjectId(id)) throw new NotFoundError("Invalid ObjectId");
       return await EventModel.findById(id);
-    }catch(error){
+    } catch (error) {
       console.error("Error getting the event with given Id:", error);
       throw error;
     }
@@ -84,7 +101,10 @@ class EventService {
   //subevent routes
 
   // Add a new sub-event
-  async addSubEvent(eventId: string, subEventData: Partial<SubEventDocument>): Promise<EventDocument> {
+  async addSubEvent(
+    eventId: string,
+    subEventData: Partial<SubEventDocument>
+  ): Promise<EventDocument> {
     const event = await EventModel.findByIdAndUpdate(
       eventId,
       { $push: { subEvents: subEventData } },
@@ -93,36 +113,49 @@ class EventService {
     if (!event) {
       throw new NotFoundError("Event with given Id not found");
     }
-    return event;
-  };
-  // Get a specific sub-event
-  async getSubEvent(eventId: string, subEventId: string): Promise<SubEventDocument> {
-    const event = await EventModel.findById(eventId);
-        if (!event) {
-          throw new NotFoundError("Event with given Id not found");
-        }
-
-        // Use the filter method to find the subEvent
-        const subEvent = event.subEvents.find(se => se.id === subEventId);
-    // const subEvent = event.subEvents.find(subEvent => subEvent._id.toString() === subEventId);
-    if (!subEvent) {
-      throw new NotFoundError("SubEvent with given ID not found in the event");
+    const cacheExist = await getKey("events");
+    if (cacheExist) {
+      await deleteKey("events");
     }
-  
-    return subEvent; // Return subEvent of type SubEventDocument
+    return event;
   }
-  
-  async updateSubEvent(eventId: string, subEventId: string, updateData: Partial<SubEventDocument>): Promise<EventDocument> {
+  // Get a specific sub-event
+  async getSubEvent(
+    eventId: string,
+    subEventId: string
+  ): Promise<SubEventDocument> {
     const event = await EventModel.findById(eventId);
     if (!event) {
       throw new NotFoundError("Event with given Id not found");
     }
-  
-    const subEventIndex = event.subEvents.findIndex(subEvent => subEvent._id.toString() === subEventId);
+
+    // Use the filter method to find the subEvent
+    const subEvent = event.subEvents.find((se) => se.id === subEventId);
+    // const subEvent = event.subEvents.find(subEvent => subEvent._id.toString() === subEventId);
+    if (!subEvent) {
+      throw new NotFoundError("SubEvent with given ID not found in the event");
+    }
+
+    return subEvent; // Return subEvent of type SubEventDocument
+  }
+
+  async updateSubEvent(
+    eventId: string,
+    subEventId: string,
+    updateData: Partial<SubEventDocument>
+  ): Promise<EventDocument> {
+    const event = await EventModel.findById(eventId);
+    if (!event) {
+      throw new NotFoundError("Event with given Id not found");
+    }
+
+    const subEventIndex = event.subEvents.findIndex(
+      (subEvent) => subEvent._id.toString() === subEventId
+    );
     if (subEventIndex === -1) {
       throw new NotFoundError("SubEvent with given ID not found in the event");
     }
-  
+
     Object.assign(event.subEvents[subEventIndex], updateData);
     // Update the subevent with the new data
     // event.subEvents[subEventIndex] = {
@@ -134,28 +167,41 @@ class EventService {
     //     subEventDate
     // };
     await event.save(); // Save the updated event document
-  
+    const cacheExist = await getKey("events");
+    if (cacheExist) {
+      await deleteKey("events");
+    }
     return event; // Optionally return the updated event
   }
-  
-  async deleteSubEvent(eventId: string, subEventId: string): Promise<EventDocument | null> {
-    console.log("Attempting to delete subEvent:", subEventId, "from event:", eventId);
-    
+
+  async deleteSubEvent(
+    eventId: string,
+    subEventId: string
+  ): Promise<EventDocument | null> {
+    console.log(
+      "Attempting to delete subEvent:",
+      subEventId,
+      "from event:",
+      eventId
+    );
+
     const event = await EventModel.findByIdAndUpdate(
       eventId,
       { $pull: { subEvents: { _id: subEventId } } },
       { new: true }
-  );
-  
+    );
+
     if (!event) {
       throw new NotFoundError("Event with given Id not found");
     }
-  
+
     console.log("Updated event after deletion:", event);
+    const cacheExist = await getKey("events");
+    if (cacheExist) {
+      await deleteKey("events");
+    }
     return event;
   }
-  
-  
 }
 
 export default new EventService();

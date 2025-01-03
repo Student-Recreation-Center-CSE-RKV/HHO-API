@@ -12,4 +12,11 @@ export const getKey = async(key: string) => {
     const value =  await client.get(key);
     return value;
 }
+export const deleteKey = async(key:string) =>{
+  const exist = await client.get(key);
+  if(exist){
+    await client.del(key);
+    console.log(key+" cache cleared");
+  }
+}
 export default client;

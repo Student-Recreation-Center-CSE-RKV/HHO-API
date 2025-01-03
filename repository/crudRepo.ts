@@ -59,11 +59,12 @@ class CrudRepository<T extends Document> {
   async getAll(): Promise<T[]>  {
     console.log("Into the repo");
     try {
+      console.log(this.model.find({}));
       const response = await this.model.find({}).maxTimeMS(5000);
       console.log(response);
       return response;
     } catch (error) {
-      throw new Error("Failed in getting all the transactions");
+      throw new Error("Failed in getting all");
     }
   }
 

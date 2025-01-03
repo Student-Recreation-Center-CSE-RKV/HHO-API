@@ -1,7 +1,7 @@
 import { ConflictError, NotFoundError } from "../exceptions/CustomError";
 import donationRepository from "../repository/DonationRepo";
 import { DonationDocument } from "../types/donationType";
-import { setKey,getKey } from "../config/redisClient";
+import { setKey,getKey,deleteKey } from "../config/redisClient";
 class DonationService{
     async createDonation(donationData: Partial<DonationDocument>): Promise<DonationDocument|null>{
         const { name, title, description,amt,photo} = donationData;
@@ -10,7 +10,10 @@ class DonationService{
         if (donationExist) {
             throw new ConflictError("Donation already exist, enter carefully");
         }
-
+        const cacheExist =await getKey("donations");
+            if(cacheExist){
+                await deleteKey("donations");
+        }
         const donation =  await donationRepository.create(donationData);
         return donation;
     }
@@ -19,6 +22,10 @@ class DonationService{
         if(!result){
             throw new NotFoundError("Donation is not found");
         }
+        const cacheExist =await getKey("donations");
+            if(cacheExist){
+                await deleteKey("donations");
+        }
         return result;
     }
 
@@ -26,6 +33,10 @@ class DonationService{
         const result = await donationRepository.update(id,donationData);
         if(!result){
             throw new NotFoundError("Donation is not found");
+        }
+        const cacheExist =await getKey("donations");
+            if(cacheExist){
+                await deleteKey("donations");
         }
         return result;
     }

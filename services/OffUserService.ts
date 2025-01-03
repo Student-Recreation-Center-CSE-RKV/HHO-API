@@ -8,7 +8,7 @@ import offUserModel from "../models/off_users";
 import OffUserRepo from "../repository/OffUserRepo";
 import { OffUserDocument } from "../types/offUserType";
 import jwt, { Jwt } from "jsonwebtoken";
-import { setKey, getKey } from "../config/redisClient";
+import { setKey, getKey, deleteKey } from "../config/redisClient";
 const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY as string;
 
 interface IPayload {
@@ -90,6 +90,10 @@ class OffUserService {
     if (!response) {
       throw new NotFoundError("Transaction with given Id not found");
     }
+    const cacheExist = await getKey("offUsers");
+    if (cacheExist) {
+      await deleteKey("offUsers");
+    }
     return response;
   }
 
@@ -97,6 +101,10 @@ class OffUserService {
     const response = await OffUserRepo.delete(id);
     if (!response) {
       throw new NotFoundError("Transaction with given Id not found");
+    }
+    const cacheExist = await getKey("offUsers");
+    if (cacheExist) {
+      await deleteKey("offUsers");
     }
     return response;
   }
@@ -110,6 +118,10 @@ class OffUserService {
       throw new ConflictError("User with given mail already exist");
     }
     const response = await OffUserRepo.create(offUSerData);
+    const cacheExist = await getKey("offUsers");
+    if (cacheExist) {
+      await deleteKey("offUsers");
+    }
     return response;
   }
 }
